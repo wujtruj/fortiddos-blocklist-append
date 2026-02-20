@@ -13,15 +13,10 @@ Install-Module -Name Posh-SSH -Scope CurrentUser
 
 ## Setup
 
-Create `config.json` in the repo root (it is gitignored):
+Copy `config.json.example` to `config.json` and fill in your credentials (`config.json` is gitignored):
 
-```json
-{
-  "host": "192.168.1.1",
-  "port": 22,
-  "username": "admin",
-  "password": "yourpassword"
-}
+```powershell
+cp config.json.example config.json
 ```
 
 ## Usage
@@ -87,4 +82,5 @@ Running a second time shows all entries as duplicates (`[~]`) — nothing is dou
 | `Convert-Blocklist.ps1` | Converts `blocklist.txt` → `blocklist.json` |
 | `blocklist.json` | Structured intermediate output |
 | `Push-Blocklist.ps1` | Pushes `blocklist.json` to FortiDDoS over SSH |
-| `config.json` | SSH credentials (gitignored — never committed) |
+| `config.json.example` | SSH credentials template (committed) |
+| `config.json` | SSH credentials — copy from example, fill in values (gitignored) |
