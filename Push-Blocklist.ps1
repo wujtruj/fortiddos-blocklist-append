@@ -34,6 +34,33 @@ $session = New-SSHSession -ComputerName $config.host `
                           -AcceptKey `
                           -ErrorAction Stop
 
+# FortiDDoS CLI requires an interactive shell — exec channel (Invoke-SSHCommand) does not work
+$stream = New-SSHShellStream -SessionId $session.SessionId
+
+# Read from the stream until the CLI prompt appears or timeout expires.
+# FortiDDoS prompt ends with '# ' (e.g. "FDD500B # ").
+function Read-UntilPrompt {
+    param(
+        [object] $Stream,
+        [int]    $TimeoutMs = 3000
+    )
+    $deadline = [DateTime]::Now.AddMilliseconds($TimeoutMs)
+    $buffer   = ''
+    while ([DateTime]::Now -lt $deadline) {
+        $chunk = $Stream.Read()
+        if ($chunk) {
+            $buffer += $chunk
+            if ($buffer -match '[#>]\s*$') { break }
+        }
+        Start-Sleep -Milliseconds 50
+    }
+    return $buffer
+}
+
+# Discard login banner and initial prompt
+$banner = Read-UntilPrompt -Stream $stream -TimeoutMs 5000
+Write-Host "  >>> BANNER: $($banner.Trim())"
+
 Write-Host "Pushing $($domains.Count) domains and $($ips.Count) IPs..."
 
 $added        = 0
@@ -44,20 +71,24 @@ $skippedItems = [System.Collections.Generic.List[string]]::new()
 
 function Invoke-BlocklistAppend {
     param(
-        [int]    $SessionId,
+        [object] $Stream,
         [string] $Command,
         [string] $Label
     )
 
     Write-Host "  >>> CMD : $Command"
+    $Stream.WriteLine($Command)
 
-    $result = Invoke-SSHCommand -SessionId $SessionId -Command $Command
+    $raw = Read-UntilPrompt -Stream $Stream
 
-    Write-Host "  >>> EXIT: $($result.ExitStatus)"
-    Write-Host "  >>> RAW : $(if ($result.Output.Count -eq 0) { '(empty)' } else { $result.Output | ConvertTo-Json -Compress })"
+    # Strip the echoed command line and the trailing prompt; keep only appliance response lines
+    $lines  = $raw -split "`r?`n" |
+              Where-Object { $_ -notmatch ([regex]::Escape($Command)) -and
+                             $_ -notmatch '[#>]\s*$' -and
+                             $_.Trim() -ne '' }
+    $output = ($lines -join ' ').Trim()
 
-    # IP errors use different phrasing than domain errors; normalise by joining all output lines
-    $output = ($result.Output -join ' ').Trim()
+    Write-Host "  >>> RAW : $(if ($output -eq '') { '(empty)' } else { $output })"
 
     if ($output -eq '') {
         Write-Host "  [+] $Label"
@@ -77,7 +108,7 @@ function Invoke-BlocklistAppend {
 # --- Push domains ---
 foreach ($domain in $domains) {
     $cmd    = "execute domain-blocklist append domain $domain"
-    $status = Invoke-BlocklistAppend -SessionId $session.SessionId -Command $cmd -Label $domain
+    $status = Invoke-BlocklistAppend -Stream $stream -Command $cmd -Label $domain
     switch ($status) {
         'added'   { $added++ }
         'skipped' { $skipped++; $skippedItems.Add("domain: $domain") }
@@ -88,7 +119,7 @@ foreach ($domain in $domains) {
 # --- Push IPs ---
 foreach ($ip in $ips) {
     $cmd    = "execute ipv4-blocklist append address $ip"
-    $status = Invoke-BlocklistAppend -SessionId $session.SessionId -Command $cmd -Label $ip
+    $status = Invoke-BlocklistAppend -Stream $stream -Command $cmd -Label $ip
     switch ($status) {
         'added'   { $added++ }
         'skipped' { $skipped++; $skippedItems.Add("ip: $ip") }
