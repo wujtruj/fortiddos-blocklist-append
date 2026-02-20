@@ -49,7 +49,13 @@ function Invoke-BlocklistAppend {
         [string] $Label
     )
 
+    Write-Host "  >>> CMD : $Command"
+
     $result = Invoke-SSHCommand -SessionId $SessionId -Command $Command
+
+    Write-Host "  >>> EXIT: $($result.ExitStatus)"
+    Write-Host "  >>> RAW : $(if ($result.Output.Count -eq 0) { '(empty)' } else { $result.Output | ConvertTo-Json -Compress })"
+
     # IP errors use different phrasing than domain errors; normalise by joining all output lines
     $output = ($result.Output -join ' ').Trim()
 
