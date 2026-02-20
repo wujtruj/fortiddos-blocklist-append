@@ -1,5 +1,7 @@
 #Requires -Version 7
 #Requires -Modules Posh-SSH
+[CmdletBinding()]
+param()
 
 $configFile    = Join-Path $PSScriptRoot 'config.json'
 $blocklistFile = Join-Path $PSScriptRoot 'blocklist.json'
@@ -59,7 +61,7 @@ function Read-UntilPrompt {
 
 # Discard login banner and initial prompt
 $banner = Read-UntilPrompt -Stream $stream -TimeoutMs 5000
-Write-Host "  >>> BANNER: $($banner.Trim())"
+Write-Verbose "BANNER: $($banner.Trim())"
 
 Write-Host "Pushing $($domains.Count) domains and $($ips.Count) IPs..."
 
@@ -76,7 +78,7 @@ function Invoke-BlocklistAppend {
         [string] $Label
     )
 
-    Write-Host "  >>> CMD : $Command"
+    Write-Verbose "CMD : $Command"
     $Stream.WriteLine($Command)
 
     $raw = Read-UntilPrompt -Stream $Stream
@@ -88,7 +90,7 @@ function Invoke-BlocklistAppend {
                              $_.Trim() -ne '' }
     $output = ($lines -join ' ').Trim()
 
-    Write-Host "  >>> RAW : $(if ($output -eq '') { '(empty)' } else { $output })"
+    Write-Verbose "RAW : $(if ($output -eq '') { '(empty)' } else { $output })"
 
     if ($output -eq '') {
         Write-Host "  [+] $Label"

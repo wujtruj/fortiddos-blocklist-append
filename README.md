@@ -40,7 +40,7 @@ pwsh ./Convert-Blocklist.ps1
 pwsh ./Push-Blocklist.ps1
 ```
 
-Opens an SSH session to the FortiDDoS appliance and appends each entry:
+Opens an interactive SSH shell session to the FortiDDoS appliance and appends each entry:
 
 ```
 execute domain-blocklist append domain <domain>
@@ -64,6 +64,22 @@ Failed (check appliance logs):
 ```
 
 Running a second time shows all entries as duplicates (`[~]`) — nothing is double-added.
+
+Add `-Verbose` to see the raw command and appliance response for each entry:
+
+```powershell
+pwsh ./Push-Blocklist.ps1 -Verbose
+```
+
+```
+Connecting to 192.168.1.1:22...
+VERBOSE: BANNER: FDD500B #
+Pushing 9 domains and 1 IPs...
+  VERBOSE: CMD : execute domain-blocklist append domain cmailer.pro
+  VERBOSE: RAW : (empty)
+  [+] cmailer.pro
+  ...
+```
 
 ## Output symbols
 
